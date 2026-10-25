@@ -1,0 +1,59 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Test
+        run: go test ./...
+
+      - name: Fetch third-party tools (pinned + hash-checked)
+        run: bash scripts/fetch-tools.sh
+
+      - name: Windows resources (icon + version info)
+        run: |
+          go install github.com/tc-hib/go-winres@v0.3.3
+          VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="0.0.0"
+          go-winres simply --arch 386 --manifest none --icon assets/icon.png \
+            --product-name "SSS Tuning ME7 Launch Control" \
+            --file-description "ME7.5 Launch Control + NLS patcher" \
+            --product-version "$VERSION" --file-version "$VERSION" \
+            --original-filename ME7_LaunchControl.exe
+
+      - name: Build exe
+        run: GOOS=windows GOARCH=386 go build -trimpath -ldflags "-s -w -H windowsgui" -o ME7_LaunchControl.exe .
+
+      - name: Package (exe + licenses)
+        run: |
+          mkdir -p dist/licenses
+          cp ME7_LaunchControl.exe README.md LICENSE THIRD_PARTY.md DISCLAIMER.md dist/
+          cp third_party/*.txt dist/licenses/
+          (cd dist && zip -r ../ME7_LaunchControl.zip .)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ME7_LaunchControl
+          path: dist/
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ME7_LaunchControl.zip
+          generate_release_notes: true

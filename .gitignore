@@ -1,0 +1,18 @@
+# Third-party binaries: fetched by scripts/fetch-tools.*, not committed
+assets/ME7Info.exe
+assets/me7sum.exe
+assets/defs/
+
+# Build output
+*.exe
+*.syso
+patchcli
+
+# Never commit ECU files
+*.bin
+*.ori
+*.ecu
+
+# Packaging
+dist/
+*.zip
